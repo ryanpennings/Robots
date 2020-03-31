@@ -13,7 +13,7 @@ using static System.Math;
 
 namespace Robots
 {
-    public enum Manufacturers { ABB, KUKA, UR, Other };
+    public enum Manufacturers { ABB, KUKA, UR, FANUC, Staubli, Other, All };
 
     public abstract class RobotSystem
     {
@@ -23,6 +23,7 @@ namespace Robots
         public Plane BasePlane { get; }
         public Mesh Environment { get; }
         public Mesh DisplayMesh { get; set; }
+        public IRemote Remote { get; protected set; }
 
         static RobotSystem()
         {
@@ -54,10 +55,16 @@ namespace Robots
             if (double.IsNaN(t)) t = 0;
             var newOrigin = a.Origin * (1 - t) + b.Origin * t;
 
-            Quaternion q = Quaternion.Rotation(a, b);
-            q.GetRotation(out var angle, out var axis);
-            angle = (angle > PI) ? angle - 2 * PI : angle;
-            a.Rotate(t * angle, axis, a.Origin);
+            //  Quaternion q = Quaternion.Rotation(a, b);
+            // var q = Quaternion.Identity.Rotate(a).Rotate(b);
+            
+            var q = Slerp(GetRotation(a), GetRotation(b), t);
+
+            //  q.GetRotation(out var angle, out var axis);
+            // angle = (angle > PI) ? angle - 2 * PI : angle;
+            //  a.Rotate(t * angle, axis, a.Origin);
+
+            a = TransformFromQuaternion(q).ToPlane();
 
             a.Origin = newOrigin;
             return a;
@@ -67,7 +74,7 @@ namespace Robots
         internal abstract List<List<List<string>>> Code(Program program);
         internal abstract double Payload(int group);
         internal abstract Joint[] GetJoints(int group);
-        public abstract List<KinematicSolution> Kinematics(IEnumerable<Target> target, IEnumerable<double[]> prevJoints = null, bool displayMeshes = false);
+        public abstract List<KinematicSolution> Kinematics(IEnumerable<Target> target, IEnumerable<double[]> prevJoints = null);
         public abstract double DegreeToRadian(double degree, int i, int group = 0);
         public abstract double[] PlaneToNumbers(Plane plane);
         public abstract Plane NumbersToPlane(double[] numbers);
@@ -190,6 +197,10 @@ namespace Robots
                         return new RobotCellKuka(name, mechanicalGroups, io, basePlane, environment);
                     case (Manufacturers.UR):
                         return new RobotCellUR(name, mechanicalGroups[0].Robot, io, basePlane, environment);
+                    case (Manufacturers.FANUC):
+                        return new RobotCellFanuc(name, mechanicalGroups, io, basePlane, environment);
+                    case (Manufacturers.Staubli):
+                        return new RobotCellStaubli(name, mechanicalGroups, io, basePlane, environment);
                 }
             }
 

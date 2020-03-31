@@ -1,20 +1,22 @@
-﻿using System;
+﻿using Rhino.Geometry;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Text;
-using Rhino.Geometry;
-using System.Collections;
+using System.Xml;
+using System.Xml.Linq;
 using static Robots.Util;
 using static System.Math;
-using static Rhino.RhinoMath;
 
 namespace Robots
 {
-    public abstract class Target
+    [Flags]
+    public enum RobotConfigurations { None = 0, Shoulder = 1, Elbow = 2, Wrist = 4, Undefined = 8 }
+    public enum Motions { Joint, Linear, Circular, Spline }
+
+    public abstract class Target : IToolpath
     {
-        [Flags]
-        public enum RobotConfigurations { None = 0, Shoulder = 1, Elbow = 2, Wrist = 4, Undefined = 8 }
-        public enum Motions { Joint, Linear, Circular, Spline }
+        public static Target Default { get; }
 
         public Tool Tool { get; set; }
         public Frame Frame { get; set; }
@@ -22,25 +24,49 @@ namespace Robots
         public Zone Zone { get; set; }
         public Command Command { get; set; }
         public double[] External { get; set; }
+        public string[] ExternalCustom { get; set; }
 
-        public static Target Default { get; }
+        public IEnumerable<Target> Targets => Enumerable.Repeat(this, 1);
 
         static Target()
         {
-            Default = new JointTarget(new double[] { 0, PI / 2, 0, 0, 0, 0 }, Tool.Default, Speed.Default, Zone.Default, null, Frame.Default, null);
+            Default = new JointTarget(new double[] { 0, PI / 2, 0, 0, 0, 0 });
         }
 
-        public Target(Tool tool, Speed speed, Zone zone, Command command, Frame frame = null, IEnumerable<double> external = null)
+        protected Target(Tool tool, Speed speed, Zone zone, Command command, Frame frame = null, IEnumerable<double> external = null)
         {
-            this.Tool = tool ?? Tool.Default;
-            this.Speed = speed ?? Speed.Default;
-            this.Zone = zone ?? Zone.Default;
-            this.Frame = frame ?? Frame.Default;
-            this.Command = command;
-            this.External = (external != null) ? external.ToArray() : new double[0];
+            Tool = tool ?? Tool.Default;
+            Speed = speed ?? Speed.Default;
+            Zone = zone ?? Zone.Default;
+            Frame = frame ?? Frame.Default;
+            Command = command ?? Command.Default;
+            External = (external != null) ? external.ToArray() : new double[0];
+        }
+
+        public void AppendCommand(Command command)
+        {
+            var current = Command;
+
+            if (current == null || current == Command.Default)
+            {
+                Command = command;
+            }
+            else
+            {
+                var group = new Commands.Group();
+
+                if (current is Commands.Group currentGroup)
+                    group.AddRange(currentGroup);
+                else
+                    group.Add(current);
+
+                group.Add(command);
+                Command = group;
+            }
         }
 
         public Target ShallowClone() => MemberwiseClone() as Target;
+        IToolpath IToolpath.ShallowClone(List<Target> targets) => MemberwiseClone() as IToolpath;
     }
 
     public class CartesianTarget : Target
@@ -68,10 +94,9 @@ namespace Robots
             string speed = $", {Speed}";
             string zone = $", {Zone}";
             string commands = Command != null ? ", Contains commands" : "";
-            string external = External.Length > 0 ? $"{External.Length.ToString():0} external axes" : "";
+            string external = External.Length > 0 ? $", {External.Length.ToString():0} external axes" : "";
             return $"Target ({type}{motion}{configuration}{frame}{tool}{speed}{zone}{commands}{external})";
         }
-
     }
 
     public class JointTarget : Target
@@ -129,12 +154,12 @@ namespace Robots
 
         public override string ToString()
         {
-            string type = $"Joint ({string.Join(",", (this as JointTarget).Joints.Select(x => $"{x:0.00}"))})";
+            string type = $"Joint ({string.Join(",", Joints.Select(x => $"{x:0.00}"))})";
             string tool = $", {Tool}";
             string speed = $", {Speed}";
             string zone = $", {Zone}";
             string commands = Command != null ? ", Contains commands" : "";
-            string external = External.Length > 0 ? $"{External.Length.ToString():0} external axes" : "";
+            string external = External.Length > 0 ? $", {External.Length.ToString():0} external axes" : "";
             return $"Target ({type}{tool}{speed}{zone}{commands}{external})";
         }
 
@@ -194,7 +219,7 @@ namespace Robots
         internal int LeadingJoint { get; set; }
 
         internal bool IsJointTarget => Target is JointTarget;
-        public bool IsJointMotion => IsJointTarget || (Target as CartesianTarget).Motion == Target.Motions.Joint;
+        public bool IsJointMotion => IsJointTarget || (Target as CartesianTarget).Motion == Motions.Joint;
         public Plane WorldPlane => Kinematics.Planes[Kinematics.Planes.Length - 1];
         public int Index => cellTarget.Index;
 
@@ -327,7 +352,7 @@ namespace Robots
                 //   Plane plane = CartesianTarget.Lerp(prevTarget.WorldPlane, this.WorldPlane, t, start, end);
                 //  Target.RobotConfigurations? configuration = (Abs(prevTarget.cellTarget.TotalTime - t) < TimeTol) ? prevTarget.Kinematics.Configuration : this.Kinematics.Configuration;
 
-                var target = new CartesianTarget(plane, Target, prevTarget.Kinematics.Configuration, Target.Motions.Linear, external);
+                var target = new CartesianTarget(plane, Target, prevTarget.Kinematics.Configuration, Motions.Linear, external);
                 // target.Frame = Frame.Default;
                 return target;
             }
@@ -359,11 +384,11 @@ namespace Robots
         /// <summary>
         /// Name of the attribute
         /// </summary>
-        public string Name { get; internal set; }
+        public virtual string Name { get; internal set; }
 
-        internal TargetAttribute SetName(string name)
+        public T CloneWithName<T>(string name) where T : TargetAttribute
         {
-            var attribute = MemberwiseClone() as TargetAttribute;
+            var attribute = MemberwiseClone() as T;
             attribute.Name = name;
             return attribute;
         }
@@ -389,8 +414,121 @@ namespace Robots
             this.Tcp = tcp;
             this.Weight = weight;
             this.Centroid = (centroid == null) ? tcp.Origin : (Point3d)centroid;
-            this.Mesh = mesh;
+            this.Mesh = mesh ?? new Mesh();
         }
+
+
+        #region Tool loading
+
+        public static List<string> ListTools()
+        {
+            var names = new List<string>();
+            var elements = new List<XElement>();
+
+            if (Directory.Exists(LibraryPath))
+            {
+                var files = Directory.GetFiles(LibraryPath, "*.xml");
+
+                foreach (var file in files)
+                {
+                    var element = XElement.Load(file);
+                    if (element.Name.LocalName == "RobotTools")
+                        elements.AddRange(element.Elements());
+                }
+            }
+
+            foreach (var element in elements)
+                names.Add($"{element.Attribute(XName.Get("name")).Value}");
+
+            return names;
+        }
+
+        public static Tool Load(string name)
+        {
+            XElement element = null;
+
+            if (Directory.Exists(LibraryPath))
+            {
+                var files = Directory.GetFiles(LibraryPath, "*.xml");
+
+                foreach (var file in files)
+                {
+                    XElement data = XElement.Load(file);
+                    if (data.Name.LocalName != "RobotTools") continue;
+                    element = data.Elements().FirstOrDefault(x => name == $"{x.Attribute(XName.Get("name")).Value}");
+                    if (element != null) break;
+                }
+            }
+
+            if (element == null) throw new InvalidOperationException($" RobotTool \"{name}\" not found");
+
+            return Create(element);
+        }
+
+        private static Tool Create(XElement element)
+        {
+            var type = element.Name.LocalName;
+            var name = element.Attribute(XName.Get("name")).Value;
+            var manufacturer = element.Attribute(XName.Get("manufacturer")).Value;
+
+            XElement baseElement = element.Element(XName.Get("TCP"));
+            double x = XmlConvert.ToDouble(baseElement.Attribute(XName.Get("x")).Value);
+            double y = XmlConvert.ToDouble(baseElement.Attribute(XName.Get("y")).Value);
+            double z = XmlConvert.ToDouble(baseElement.Attribute(XName.Get("z")).Value);
+            double q1 = XmlConvert.ToDouble(baseElement.Attribute(XName.Get("q1")).Value);
+            double q2 = XmlConvert.ToDouble(baseElement.Attribute(XName.Get("q2")).Value);
+            double q3 = XmlConvert.ToDouble(baseElement.Attribute(XName.Get("q3")).Value);
+            double q4 = XmlConvert.ToDouble(baseElement.Attribute(XName.Get("q4")).Value);
+
+            Plane plane;
+            Quaternion q = new Quaternion(q1, q2, q3, q4);
+            Point3d p = new Point3d(x, y, z);
+            q.GetRotation(out plane);
+            plane.Origin = p;
+
+            baseElement = element.Element(XName.Get("Weight"));
+
+            double weight = XmlConvert.ToDouble(baseElement.Value);
+
+            Mesh mesh = GetMeshes(name);
+
+            Tool tool = new Tool(plane, name, weight, null, mesh);
+
+            return tool;
+        }
+
+        private static Mesh GetMeshes(string model)
+        {
+            Mesh mesh = new Mesh();
+
+            if (Directory.Exists(LibraryPath))
+            {
+                var files = Directory.GetFiles(LibraryPath, "*.3dm");
+                Rhino.DocObjects.Layer layer = null;
+
+                foreach (var file in files)
+                {
+                    Rhino.FileIO.File3dm geometry = Rhino.FileIO.File3dm.Read(file);
+                    layer = geometry.AllLayers.FirstOrDefault(x => x.Name == model);
+
+                    if (layer != null)
+                    {
+                        var meshes = geometry.Objects.Where(x => x.Attributes.LayerIndex == layer.Index).Select(x => x.Geometry as Mesh);
+
+                        foreach (var part in meshes)
+                            mesh.Append(part);
+
+                        break;
+                    }
+                }
+                if (layer == null)
+                    throw new InvalidOperationException($" Tool \"{model}\" is not in the geometry file.");
+            }
+
+            return mesh;
+        }
+
+        #endregion
 
         public void FourPointCalibration(Plane a, Plane b, Plane c, Plane d)
         {
@@ -410,9 +548,9 @@ namespace Robots
         /// </summary>
         class CircumcentreSolver
         {
-            private double x, y, z;
-            private double radius;
-            private double[,] p = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
+             double x, y, z;
+             double radius;
+             double[,] p = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
 
             internal Point3d Center => new Point3d(x, y, z);
             internal double Radius => radius;
@@ -456,7 +594,7 @@ namespace Robots
                 this.Sphere();
             }
 
-            private void Sphere()
+             void Sphere()
             {
                 double m11, m12, m13, m14, m15;
                 double[,] a = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } };
@@ -534,7 +672,7 @@ namespace Robots
             double Determinant(double[,] a, double n)
             {
                 int i, j, j1, j2;
-                double d = 0;
+                double d;
                 double[,] m =
                         {
                     { 0, 0, 0, 0 },
@@ -637,20 +775,42 @@ namespace Robots
         /// The zone size for the tool reorientation in radians.
         /// </summary>
         public double Rotation { get; set; }
+        /// <summary>
+        /// The zone size for revolute external axis in radians.
+        /// </summary>
+        public double RotationExternal { get; set; }
+
         public bool IsFlyBy => Distance > DistanceTol;
 
         public static Zone Default { get; }
 
         static Zone()
         {
-            Default = new Zone(0, "DefaultZone");
+            Default = new Zone(0, name:"DefaultZone");
         }
 
-        public Zone(double distance, string name = null)
+        //public Zone(double distance, string name = null)
+        //{
+        //    Name = name;
+        //    Distance = distance;
+        //    Rotation = (distance / 10).ToRadians();
+        //    RotationExternal = Rotation;
+        //}
+
+        public Zone(double distance, double? rotation = null, double? rotationExternal = null, string name = null)
         {
-            this.Name = name;
-            this.Distance = distance;
-            this.Rotation = (distance / 10).ToRadians();
+            Name = name;
+            Distance = distance;
+
+            if (rotation.HasValue)
+                Rotation = rotation.Value;
+            else
+                Rotation = (distance / 10).ToRadians();
+
+            if (rotationExternal.HasValue)
+                RotationExternal = rotationExternal.Value;
+            else
+                RotationExternal = Rotation;
         }
 
         public override string ToString() => (Name != null) ? $"Zone ({Name})" : IsFlyBy ? $"Zone ({Distance:0.00} mm)" : $"Zone (Stop point)";

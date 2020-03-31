@@ -8,6 +8,46 @@ using System.Drawing;
 
 namespace Robots.Grasshopper
 {
+    public class GH_Toolpath : GH_Goo<IToolpath>
+    {
+        public GH_Toolpath() { Value = new SimpleToolpath(); }
+        public GH_Toolpath(IToolpath native) { Value = native; }
+        public override IGH_Goo Duplicate() => new GH_Toolpath(Value);
+        public override bool IsValid => true;
+        public override string TypeName => "Toolpath";
+        public override string TypeDescription => "Toolpath";
+        public override string ToString()
+        {
+            switch (Value.Targets)
+            {
+                case IList<Target> list:
+                    var targets = Value.Targets as IList<Target>;
+                    return $"Toolpath with ({targets.Count} targets)";
+                case Target target:
+                    return target.ToString();
+                default:
+                    return "Toolpath";
+            }
+        }
+        public override object ScriptVariable() => Value;
+
+        public override bool CastFrom(object source)
+        {
+            if (source is GH_Target)
+            {
+                Value = (source as GH_Target).Value;
+                return true;
+            }
+
+            if (source is IToolpath)
+            {
+                Value = source as IToolpath;
+                return true;
+            }
+            return false;
+        }
+    }
+
     public class GH_Program : GH_Goo<Program>
     {
         public GH_Program() { this.Value = null; }
@@ -178,6 +218,26 @@ namespace Robots.Grasshopper
                 return true;
             }
 
+            if (source is GH_String)
+            {
+                string[] texts = (source as GH_String).Value.Split(',');
+                double[] values = new double[texts.Length];
+
+                for (int i = 0; i < texts.Length; i++)
+                    if (!GH_Convert.ToDouble_Secondary(texts[i], ref values[i])) return false;
+
+                if (texts.Length == 1)
+                {
+                    Value = new Zone(values[0]);
+                    return true;
+                }
+                else if (texts.Length == 2)
+                {
+                    Value = new Zone(values[0], values[1]);
+                    return true;
+                }
+            }
+
             double value = 0;
             if (GH_Convert.ToDouble_Secondary(source, ref value))
             {
@@ -269,18 +329,18 @@ namespace Robots.Grasshopper
                 return false;
         }
 
-        public BoundingBox ClippingBox => Value.DisplayMesh.GetBoundingBox(true); 
- 
- 
-         public void DrawViewportMeshes(GH_PreviewMeshArgs args)
-         { 
-             args.Pipeline.DrawMeshShaded(Value.DisplayMesh, args.Material); 
-         } 
- 
- 
-         public void DrawViewportWires(GH_PreviewWireArgs args)
-         { 
-         } 
+        public BoundingBox ClippingBox => Value.DisplayMesh.GetBoundingBox(true);
+
+
+        public void DrawViewportMeshes(GH_PreviewMeshArgs args)
+        {
+            args.Pipeline.DrawMeshShaded(Value.DisplayMesh, args.Material);
+        }
+
+
+        public void DrawViewportWires(GH_PreviewWireArgs args)
+        {
+        }
 
     }
 }
