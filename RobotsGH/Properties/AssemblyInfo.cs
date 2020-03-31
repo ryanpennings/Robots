@@ -2,17 +2,16 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Rhino.PlugIns;
+using System;
+using System.Drawing;
+using Grasshopper.Kernel;
 
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("Robots")]
 [assembly: AssemblyDescription("Provides components to visualize and create programs for ABB, KUKA and UR robots. Developed as an open source tool to interact with the robots at Bartlett School of Architecture.")]
-[assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("Robots")]
-[assembly: AssemblyCopyright("Copyright ©  2015")]
+[assembly: AssemblyCopyright("Copyright ©  2017")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -34,5 +33,21 @@ using Rhino.PlugIns;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.0.0.1")]
-[assembly: AssemblyFileVersion("1.0.0.1")]
+
+[assembly: GH_Loading(GH_LoadingDemand.ForceDirect)]
+
+namespace Robots.Grasshopper
+{
+    public class RobotsInfo : GH_AssemblyInfo
+    {
+        public RobotsInfo() { }
+        public override string Name => "Robots";
+        public override Bitmap Icon => Properties.Resources.iconRobot;
+        public override string Description => "Provides components to visualize and create programs for ABB, KUKA and UR robots. Developed as an open source tool to program the robots at Bartlett School of Architecture.";
+        public override Guid Id => new Guid("0c4dd17f-db66-4895-9565-412eb167503f");
+        public override string AssemblyVersion => "0.0.5";
+        public override GH_LibraryLicense License => GH_LibraryLicense.opensource;
+        public override string AuthorName => "Bartlett BMADE";
+        public override string AuthorContact => "v.soler@ucl.ac.uk, vincent.huyghe.13@ucl.ac.uk";
+    }
+}

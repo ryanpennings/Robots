@@ -11,27 +11,25 @@ namespace Robots
     {
         public double[] Joints { get; internal set; }
         public Plane[] Planes { get; internal set; }
-        public Mesh[] Meshes { get; internal set; }
         public List<string> Errors { get; internal set; } = new List<string>();
-        public Target.RobotConfigurations Configuration { get; internal set; }
+        public RobotConfigurations Configuration { get; internal set; }
     }
 
     public abstract partial class RobotArm
     {
         protected abstract class RobotKinematics : MechanismKinematics
         {
-            protected RobotKinematics(RobotArm robot, Target target, double[] prevJoints = null, bool displayMeshes = false, Plane? basePlane = null) : base(robot, target, prevJoints, displayMeshes, basePlane) { }
+            protected RobotKinematics(RobotArm robot, Target target, double[] prevJoints = null, Plane? basePlane = null) : base(robot, target, prevJoints, basePlane) { }
 
             protected override void SetJoints(Target target, double[] prevJoints)
             {
-                if (target is JointTarget)
+                if (target is JointTarget jointTarget)
                 {
-                    Joints = (target as JointTarget).Joints;
+                    Joints = jointTarget.Joints;
                 }
-                else if (target is CartesianTarget)
+                else if (target is CartesianTarget cartesianTarget)
                 {
                     double[] joints = null;
-                    var cartesianTarget = target as CartesianTarget;
                     Plane tcp = target.Tool.Tcp;
                     tcp.Rotate(PI, Vector3d.ZAxis, Point3d.Origin);
 
@@ -44,7 +42,7 @@ namespace Robots
 
                     if (cartesianTarget.Configuration != null || prevJoints == null)
                     {
-                        Configuration = cartesianTarget.Configuration ?? Target.RobotConfigurations.None;
+                        Configuration = cartesianTarget.Configuration ?? RobotConfigurations.None;
                         joints = InverseKinematics(transform, Configuration, out errors);
                     }
                     else
@@ -69,7 +67,7 @@ namespace Robots
                 if (target is JointTarget)
                 {
                     var closest = GetClosestSolution(jointTransforms[jointTransforms.Length - 1], Joints, out var configuration, out var errors, out var difference);
-                    this.Configuration = difference < AngleTol ? configuration : Target.RobotConfigurations.Undefined;
+                    this.Configuration = difference < AngleTol ? configuration : RobotConfigurations.Undefined;
                 }
 
                 for (int i = 0; i < 6; i++)
@@ -87,7 +85,7 @@ namespace Robots
                 */
             }
 
-            protected abstract double[] InverseKinematics(Transform transform, Target.RobotConfigurations configuration, out List<string> errors);
+            protected abstract double[] InverseKinematics(Transform transform, RobotConfigurations configuration, out List<string> errors);
             protected abstract Transform[] ForwardKinematics(double[] joints);
 
             double SquaredDifference(double a, double b)
@@ -98,14 +96,14 @@ namespace Robots
                 return difference * difference;
             }
 
-            double[] GetClosestSolution(Transform transform, double[] prevJoints, out Target.RobotConfigurations configuration, out List<string> errors, out double difference)
+            double[] GetClosestSolution(Transform transform, double[] prevJoints, out RobotConfigurations configuration, out List<string> errors, out double difference)
             {
                 var solutions = new double[8][];
                 var solutionsErrors = new List<List<string>>(8);
 
                 for (int i = 0; i < 8; i++)
                 {
-                    solutions[i] = InverseKinematics(transform, (Target.RobotConfigurations)i, out var solutionErrors);
+                    solutions[i] = InverseKinematics(transform, (RobotConfigurations)i, out var solutionErrors);
                     solutions[i] = JointTarget.GetAbsoluteJoints(solutions[i], prevJoints);
                     solutionsErrors.Add(solutionErrors);
                 }
@@ -125,7 +123,7 @@ namespace Robots
                 }
 
                 difference = closestDifference;
-                configuration = (Target.RobotConfigurations)closestSolutionIndex;
+                configuration = (RobotConfigurations)closestSolutionIndex;
                 errors = solutionsErrors[closestSolutionIndex];
                 return solutions[closestSolutionIndex];
             }
@@ -136,7 +134,7 @@ namespace Robots
         {
             //   static double[] StartPosition = new double[] { 0, PI / 2, 0, 0, 0, -PI };
 
-            public SphericalWristKinematics(RobotArm robot, Target target, double[] prevJoints, bool displayMeshes, Plane? basePlane) : base(robot, target, prevJoints, displayMeshes, basePlane) { }
+            public SphericalWristKinematics(RobotArm robot, Target target, double[] prevJoints, Plane? basePlane) : base(robot, target, prevJoints, basePlane) { }
 
             /// <summary>
             /// Inverse kinematics for a spherical wrist 6 axis robot.
@@ -144,14 +142,14 @@ namespace Robots
             /// </summary>
             /// <param name="target">Cartesian target</param>
             /// <returns>Returns the 6 rotation values in radians.</returns>
-            override protected double[] InverseKinematics(Transform transform, Target.RobotConfigurations configuration, out List<string> errors)
+            override protected double[] InverseKinematics(Transform transform, RobotConfigurations configuration, out List<string> errors)
             {
                 errors = new List<string>();
 
-                bool shoulder = configuration.HasFlag(Target.RobotConfigurations.Shoulder);
-                bool elbow = configuration.HasFlag(Target.RobotConfigurations.Elbow);
+                bool shoulder = configuration.HasFlag(RobotConfigurations.Shoulder);
+                bool elbow = configuration.HasFlag(RobotConfigurations.Elbow);
                 if (shoulder) elbow = !elbow;
-                bool wrist = !configuration.HasFlag(Target.RobotConfigurations.Wrist);
+                bool wrist = !configuration.HasFlag(RobotConfigurations.Wrist);
 
                 bool isUnreachable = false;
 
@@ -267,7 +265,7 @@ namespace Robots
                 double[] d = mechanism.Joints.Select(joint => joint.D).ToArray();
 
                 transforms[0] = new double[4, 4] { { c[0], 0, c[0], c[0] + a[0] * c[0] }, { s[0], -c[0], s[0], s[0] + a[0] * s[0] }, { 0, 0, 0, d[0] }, { 0, 0, 0, 1 } }.ToTransform();
-                transforms[1] = new double[4, 4] { { c[0] * (c[1] - s[1]), s[0], c[0] * (c[1] + s[1]), c[0] * ((c[1] - s[1]) + a[1] * c[1]) + a[0] * c[0] }, { s[0] * (c[1] - s[1]), -c[0], s[0] * (c[1] + s[1]), s[0] * ((c[1] - s[1]) + a[1] * c[1]) + a[0] * s[0] }, { s[1] + c[1], 0, s[1] - c[1], (s[1] + c[1]) + a[1] * s[1] + d[0] }, { 0, 0, 0, 1 } }.ToTransform(); ;
+                transforms[1] = new double[4, 4] { { c[0] * (c[1] - s[1]), s[0], c[0] * (c[1] + s[1]), c[0] * ((c[1] - s[1]) + a[1] * c[1]) + a[0] * c[0] }, { s[0] * (c[1] - s[1]), -c[0], s[0] * (c[1] + s[1]), s[0] * ((c[1] - s[1]) + a[1] * c[1]) + a[0] * s[0] }, { s[1] + c[1], 0, s[1] - c[1], (s[1] + c[1]) + a[1] * s[1] + d[0] }, { 0, 0, 0, 1 } }.ToTransform();
                 transforms[2] = new double[4, 4] { { c[0] * (c[1] * c[2] - s[1] * s[2]), s[0], c[0] * (c[1] * s[2] + s[1] * c[2]), c[0] * (a[2] * (c[1] * c[2] - s[1] * s[2]) + a[1] * c[1]) + a[0] * c[0] }, { s[0] * (c[1] * c[2] - s[1] * s[2]), -c[0], s[0] * (c[1] * s[2] + s[1] * c[2]), s[0] * (a[2] * (c[1] * c[2] - s[1] * s[2]) + a[1] * c[1]) + a[0] * s[0] }, { s[1] * c[2] + c[1] * s[2], 0, s[1] * s[2] - c[1] * c[2], a[2] * (s[1] * c[2] + c[1] * s[2]) + a[1] * s[1] + d[0] }, { 0, 0, 0, 1 } }.ToTransform();
                 transforms[3] = new double[4, 4] { { c[3] - s[3], -c[3] - s[3], c[3], c[3] }, { s[3] + c[3], -s[3] + c[3], s[3], s[3] }, { 0, 0, 0, 0 + d[3] }, { 0, 0, 0, 1 } }.ToTransform();
                 transforms[4] = new double[4, 4] { { c[3] * c[4] - s[3], -c[3] * c[4] - s[3], c[3] * s[4], c[3] * s[4] }, { s[3] * c[4] + c[3], -s[3] * c[4] + c[3], s[3] * s[4], s[3] * s[4] }, { -s[4], s[4], c[4], c[4] + d[3] }, { 0, 0, 0, 1 } }.ToTransform();
@@ -283,7 +281,7 @@ namespace Robots
 
         protected class OffsetWristKinematics : RobotKinematics
         {
-            public OffsetWristKinematics(RobotArm robot, Target target, double[] prevJoints, bool displayMeshes, Plane? basePlane) : base(robot, target, prevJoints, displayMeshes, basePlane) { }
+            public OffsetWristKinematics(RobotArm robot, Target target, double[] prevJoints, Plane? basePlane) : base(robot, target, prevJoints, basePlane) { }
 
             /// <summary>
             /// Inverse kinematics for a offset wrist 6 axis robot.
@@ -291,14 +289,14 @@ namespace Robots
             /// </summary>
             /// <param name="target">Cartesian target</param>
             /// <returns>Returns the 6 rotation values in radians.</returns>
-            override protected double[] InverseKinematics(Transform transform, Target.RobotConfigurations configuration, out List<string> errors)
+            override protected double[] InverseKinematics(Transform transform, RobotConfigurations configuration, out List<string> errors)
             {
                 errors = new List<string>();
 
-                bool shoulder = configuration.HasFlag(Target.RobotConfigurations.Shoulder);
-                bool elbow = configuration.HasFlag(Target.RobotConfigurations.Elbow);
+                bool shoulder = configuration.HasFlag(RobotConfigurations.Shoulder);
+                bool elbow = configuration.HasFlag(RobotConfigurations.Elbow);
                 if (shoulder) elbow = !elbow;
-                bool wrist = !configuration.HasFlag(Target.RobotConfigurations.Wrist);
+                bool wrist = !configuration.HasFlag(RobotConfigurations.Wrist);
                 if (shoulder) wrist = !wrist;
 
                 double[] joints = new double[6];
