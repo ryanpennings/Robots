@@ -142,7 +142,7 @@ namespace Robots
                     }
                 }
 
-                // RP - Add loadsession variables
+                // RP - Add loadsession variables for background loading
                 for (int j = 0; j < program.MultiFileIndices.Count; j++)
                 {
                     code.Add($"VAR loadsession load{j:000};");
@@ -164,7 +164,9 @@ namespace Robots
                     code.Add($"SyncMoveOn sync1, all_tasks;");
                 }
 
-                // RP - should probably make this selectable? - normal load vs background load
+                // RP - TODO (maybe) make this selectable? - normal load vs background load
+                // Added background load functionaly to load large files in background
+                // This still leaves a small pause when it changes modules
 
                 if (multiProgram)
                 {
@@ -177,13 +179,13 @@ namespace Robots
                         //code.Add($"%\"{program.Name}_{groupName}_{i:000}:Main\"%;");
                         //code.Add($"UnLoad \"HOME:/{program.Name}/{program.Name}_{groupName}_{i:000}.MOD\";");
 
-                        // Remember to load the first module - with simple waitload - i think this is wrong still
+                        // Remember to load the first module - with simple waitload
                         if (i == 0)
                         {
-                            code.Add($"StartLoad\\Dyanmic, \"HOME:/{program.Name}/{program.Name}_{groupName}_{i:000}.MOD\", load{i:000};");
+                            code.Add($"StartLoad\\Dynamic, \"HOME:/{program.Name}/{program.Name}_{groupName}_{i:000}.MOD\", load{i:000};");
                             code.Add($"WaitLoad, load{i:000};");
 
-                            code.Add($"StartLoad\\Dyanmic, \"HOME:/{program.Name}/{program.Name}_{groupName}_{_k:000}.MOD\", load{_k:000};");
+                            code.Add($"StartLoad\\Dynamic, \"HOME:/{program.Name}/{program.Name}_{groupName}_{_k:000}.MOD\", load{_k:000};");
                             code.Add($"%\"{program.Name}_{groupName}_{i:000}:Main\"%;");
                             code.Add($"WaitLoad\\UnloadPath:= \"HOME:/{program.Name}/{program.Name}_{groupName}_{i:000}.MOD\", load{_k:000};");
                         } else
@@ -191,14 +193,14 @@ namespace Robots
 
                             if (i < program.MultiFileIndices.Count - 1)
                             {
-                                code.Add($"StartLoad\\Dyanmic, \"HOME:/{program.Name}/{program.Name}_{groupName}_{_k:000}.MOD\", load{_k:000};");
+                                code.Add($"StartLoad\\Dynamic, \"HOME:/{program.Name}/{program.Name}_{groupName}_{_k:000}.MOD\", load{_k:000};");
                                 code.Add($"%\"{program.Name}_{groupName}_{i:000}:Main\"%;");
                                 code.Add($"WaitLoad\\UnloadPath:= \"HOME:/{program.Name}/{program.Name}_{groupName}_{i:000}.MOD\", load{_k:000};");
                             }
                             else
                             {
                                 code.Add($"%\"{program.Name}_{groupName}_{i:000}:Main\"%;");
-                                code.Add($"UnLoad \"HOME:/ PrintingVase170810_02 / PrintingVase170810_02_T_ROB1_005.MOD");
+                                code.Add($"UnLoad \"HOME:/{program.Name}/{program.Name}_{groupName}_{i:000}.MOD\", load{_k:000};");
                             }
 
                         }
@@ -325,7 +327,15 @@ namespace Robots
                                     string pos = $"[{plane.OriginX:0.###},{plane.OriginY:0.###},{plane.OriginZ:0.###}]";
                                     string orient = $"[{quaternion.A:0.#####},{quaternion.B:0.#####},{quaternion.C:0.#####},{quaternion.D:0.#####}]";
                                     string robtarget = $"[{pos},{orient},conf,{external}]";
-                                    moveText = $@"MoveL {robtarget}{id},{target.Speed.Name},{zone},{target.Tool.Name} \WObj:={target.Frame.Name};";
+                                    // if statement for trigg movements
+                                    if (1 = 1)
+                                    {
+                                        moveText = $@"MoveL {robtarget}{id},{target.Speed.Name},{zone},{target.Tool.Name} \WObj:={target.Frame.Name};";
+                                    } else if (1 = 2)
+                                    { // add stuff that allows multiple triggers to be defined and used via \T2 \T3 .... \T8 or just use an array?
+                                        moveText = $@"TriggL {robtarget}{id},{target.Speed.Name},{target.Trigg.Value},{zone},{target.Tool.Name} \WObj:={target.Frame.Name};";
+                                    }
+                                    
                                     break;
                                 }
                         }

@@ -95,7 +95,7 @@ namespace Robots.Grasshopper.Commands
 
             var command = new Robots.Commands.Custom(name);
 
-            if(!Enum.TryParse<Manufacturers>(manufacturerText, out var manufacturer))
+            if (!Enum.TryParse<Manufacturers>(manufacturerText, out var manufacturer))
             {
                 throw new ArgumentException($"Manufacturer {manufacturerText} not valid.");
             }
@@ -333,5 +333,283 @@ namespace Robots.Grasshopper.Commands
             var command = new Robots.Commands.Message(message);
             DA.SetData(0, new GH_Command(command));
         }
+    }
+
+    // Create Trigg Component for ABB
+    public class Trigg : GH_Component
+    {
+        public Trigg() : base("Trigg", "T", "Creates a trigger command for use with ABB robots", "Robots", "Commands") { }
+        public override GH_Exposure Exposure => GH_Exposure.secondary;
+        public override Guid ComponentGuid => new Guid("{8785e050-502b-45c7-8e8b-e6dd84c25e93}");
+        protected override System.Drawing.Bitmap Icon => Properties.Resources.iconCustomCommand; // Trigg Icon - need to create one
+
+        protected override void RegisterInputParams(GH_InputParamManager pManager)
+        {
+            Params.RegisterInputParam(parameters[2]);
+            AddParam(1);
+            AddParam(2);
+            AddParam(3);
+        }
+
+        protected override void RegisterOutputParams(GH_OutputParamManager pManager)
+        {
+            pManager.AddParameter(new TriggParameter(), "Trigg", "Tr", "Trigg", GH_ParamAccess.item);
+        }
+
+        protected override void SolveInstance(IGH_DataAccess DA)
+        {
+            bool hasTriggSpeed = Params.Input.Any(x => x.Name == "TriggSpeed");
+            bool hasTriggIO = Params.Input.Any(x => x.Name == "TriggIO");
+            bool hasTriggEquip = Params.Input.Any(x => x.Name == "TriggSpeed");
+
+            // Shared Vars
+            //bool hasDistance = Params.Input.Any(x => x.Name == "Distance");
+            bool hasAOp = Params.Input.Any(x => x.Name == "AnalogOut");
+            bool hasDOp = Params.Input.Any(x => x.Name == "DigitalOutput");
+            bool hasGOp = Params.Input.Any(x => x.Name == "GroupDigitalOutput");
+            bool hasSetValue = Params.Input.Any(x => x.Name == "SetValue");
+            //bool hasVariableName = Params.Input.Any(x => x.Name == "NameOfTriggDataVar");
+
+            // TriggSpeed Vars
+            bool hasScaleLag = Params.Input.Any(x => x.Name == "ScaleLag");
+            bool hasScaleValue = Params.Input.Any(x => x.Name == "ScaleValue");
+            bool hasDipLag = Params.Input.Any(x => x.Name == "DipLag");
+
+            // TriggIO Vars
+            bool hasTime = Params.Input.Any(x => x.Name == "Time");
+
+            // Trigg Equip Vars
+            bool hasEquipLag = Params.Input.Any(x => x.Name == "EquipLag");
+
+            GH_String triggdata_var_name = null;
+            // check data types later
+            double Distance = null;
+            GH_String AOp = null;
+            GH_String DOp = null;
+            GH_String GOp = null;
+            double SetValue = null;
+            GH_String triggdata_name = null;
+            double ScaleLag = null;
+            dobule ScaleValue = null;
+            double DipLag = null;
+            double Time = null;
+            double EquipLag = null;
+
+            if (hasTriggSpeed)
+            {
+
+            }
+
+            if (hasTriggIO)
+            {
+
+            }
+
+            if (hasTriggEquip)
+            {
+
+            }
+
+            if (hasSetValue)
+            {
+
+            }
+
+            if (hasAOp)
+            {
+
+            }
+
+            if (hasDOp)
+            {
+
+            }
+
+            if (hasGOp)
+            {
+
+            }
+
+            if (hasScaleLag)
+            {
+
+            }
+
+            if (hasScaleValue)
+            {
+
+            }
+
+            if (hasDipLag)
+            {
+
+            }
+
+            if (hasTime)
+            {
+
+            }
+
+            if (hasEquipLag)
+            {
+
+            }
+
+
+        }
+
+        // Variable inputs
+
+        IGH_Param[] parameters = new IGH_Param[11]
+        {
+            // check param names etc
+             new Param_Double() { Name = "Distance", NickName = "D", Description = "Distance from end point trigger occurs", Optional = false },
+             new Param_String() { Name = "TriggData Name", NickName = "TrD", Description = "Name of TriggData Var", Optional = false },
+             new Param_String() { Name = "Digital Output", NickName = "DO", Description = "Name of Digital Output for Trigg Command", Optional = true },
+             new Param_String() { Name = "Analog Output", NickName = "AO", Description = "Name of Analog Output for Trigg Command", Optional = true },
+             new Param_String() { Name = "Group Output", NickName = "DO", Description = "Name of Group Digital Output for Trigg Command", Optional = true },
+             new Param_Double() { Name = "EquipLag", NickName = "El", Description = "Lag Time of external equipment (TriggEquip)", Optional = true },
+             new Param_Double() { Name = "ScaleLag", NickName = "Sl", Description = "Lag Time of the robot to change the scaled output (TriggSpeed)", Optional = true },
+             new Param_Double() { Name = "ScaleValue", NickName = "Sv", Description = "Scale value for the scaled output (scale_value * actual TCP speed in mm/s) (TriggSpeed)", Optional = true },
+             new Param_Double() { Name = "DipLag", NickName = "Dl", Description = "Lag Time for scaled output when robot changes speed. (TriggSpeed)", Optional = true },
+             new Param_Double() { Name = "SetValue", NickName = "V", Description = "Value to set at trigger time. (TriggIO, TriggEquip)", Optional = true },
+             new Param_Double() { Name = "Time", NickName = "Tm", Description = "Time before or after trigger to set IO. (TriggIO)", Optional = true },
+
+        };
+
+        bool isTriggIO = true;
+        bool isTriggEquip = false;
+        bool isTriggSpeed = false;
+
+        public override bool Write(GH_IWriter writer)
+        {
+            //writer.SetBoolean("IsCartesian", isCartesian);
+            //return base.Write(writer);
+        }
+
+        public override bool Read(GH_IReader reader)
+        {
+            //isCartesian = reader.GetBoolean("IsCartesian");
+            //return base.Read(reader);
+        }
+
+
+
+        protected override void AppendAdditionalComponentMenuItems(System.Windows.Forms.ToolStripDropDown menu)
+        {
+            // 1 only
+            Menu_AppendItem(menu, "TriggIO", SwitchTriggCmd, true, true);
+            Menu_AppendItem(menu, "TriggEquip", SwitchTriggCmd, true, true);
+            Menu_AppendItem(menu, "TriggSpeed", SwitchTriggCmd, true, true);
+            Menu_AppendSeparator(menu);
+            // Common - don't need these 3 since they'll always be there
+            ////Menu_AppendItem(menu, "Distance", ??, true, true, Params.Input.Any(x => x.Name == "Distance"));
+            Menu_AppendItem(menu, "SetValue", AddSetValue, true, true, Params.Input.Any(x => x.Name == "SetValue"));
+            ////Menu_AppendItem(menu, "TriggData", ??, true, true, Params.Input.Any(x => x.Name == "TriggData"));
+            //Menu_AppendSeparator(menu);
+            // these need to be set to 1 only
+            Menu_AppendItem(menu, "DO", AddDO, true, true, Params.Input.Any(x => x.Name == "DO"));
+            Menu_AppendItem(menu, "AO", AddAO, true, true, Params.Input.Any(x => x.Name == "AO"));
+            Menu_AppendItem(menu, "GO", AddGO, true, true, Params.Input.Any(x => x.Name == "GO"));
+            // TriggIO
+            Menu_AppendItem(menu, "Time", AddTime, isTriggIO, Params.Input.Any(x => x.Name == "Time"));
+            //Menu_AppendSeparator(menu);
+            // TriggEquip
+            //Menu_AppendItem(menu, "EquipLag", ??, true, isTriggEquip, Params.Input.Any(x => x.Name == "EquipLag"));
+            Menu_AppendSeparator(menu);
+            // TriggSpeed
+            //Menu_AppendItem(menu, "Scale Lag", ??, isTriggSpeed, Params.Input.Any(x => x.Name == "ScaleLag"));
+            //Menu_AppendItem(menu, "Scale Value", ??, isTriggSpeed, Params.Input.Any(x => x.Name == "ScaleValue"));
+            Menu_AppendItem(menu, "Dip Lag", AddDipLag, isTriggSpeed, Params.Input.Any(x => x.Name == "Dip Lag"));
+
+        }
+
+        // Varible methods
+
+        private void SwitchTriggType()
+        {
+            // ensure not duplicating
+            if (isTriggIO)
+            {
+                isTriggEquip = false;
+                isTriggSpeed = false;
+            }
+            else if (isTriggEquip)
+            {
+                isTriggIO = false;
+                isTriggSpeed = false;
+            }
+            else
+            {
+                isTriggEquip = false;
+                isTriggIO = false;
+                isTriggSpeed = true;
+            }
+
+
+            if (isTriggIO)
+            {
+                Params.UnregisterInputParameter(Params.Input.FirstOrDefault(x => x.Name == "Plane"), true);
+                Params.UnregisterInputParameter(Params.Input.FirstOrDefault(x => x.Name == "RobConf"), true);
+                Params.UnregisterInputParameter(Params.Input.FirstOrDefault(x => x.Name == "Motion"), true);
+                AddParam(3);
+                AddParam(10);
+            }
+            else if (isTriggEquip)
+            {
+                Params.UnregisterInputParameter(Params.Input.FirstOrDefault(x => x.Name == "Joints"), true);
+                AddParam(3);
+                AddParam(6);
+
+            }
+            else if (isTriggSpeed)
+            {
+                AddParam(7);
+                AddParam(8);
+            }
+
+            Params.OnParametersChanged();
+            ExpireSolution(true);
+        }
+        private void SwitchTriggTypeEvent(object sender, EventArgs e) => SwitchTriggType();
+
+        private void AddParam(int index)
+        {
+            IGH_Param parameter = parameters[index];
+
+            if (Params.Input.Any(x => x.Name == parameter.Name))
+                Params.UnregisterInputParameter(Params.Input.First(x => x.Name == parameter.Name), true);
+            else
+            {
+                int insertIndex = Params.Input.Count;
+                for (int i = 0; i < Params.Input.Count; i++)
+                {
+                    int otherIndex = Array.FindIndex(parameters, x => x.Name == Params.Input[i].Name);
+                    if (otherIndex > index)
+                    {
+                        insertIndex = i;
+                        break;
+                    }
+                }
+                Params.RegisterInputParam(parameter, insertIndex);
+            }
+            Params.OnParametersChanged();
+            ExpireSolution(true);
+        }
+
+        private void AddSetValue(object sender, EventArgs e) => AddParam(10);
+        private void AddDO(object sender, EventArgs e) => AddParam(3);
+        private void AddAO(object sender, EventArgs e) => AddParam(4);
+        private void AddGO(object sender, EventArgs e) => AddParam(5);
+        private void AddTime(object sender, EventArgs e) => AddParam(11);
+        private void AddDipLag(object sender, EventArgs e) => AddParam(9);
+
+
+
+        bool IGH_VariableParameterComponent.CanInsertParameter(GH_ParameterSide side, int index) => false;
+        bool IGH_VariableParameterComponent.CanRemoveParameter(GH_ParameterSide side, int index) => false;
+        IGH_Param IGH_VariableParameterComponent.CreateParameter(GH_ParameterSide side, int index) => null;
+        bool IGH_VariableParameterComponent.DestroyParameter(GH_ParameterSide side, int index) => false;
+        void IGH_VariableParameterComponent.VariableParameterMaintenance() { }
     }
 }

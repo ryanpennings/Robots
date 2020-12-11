@@ -181,4 +181,23 @@ namespace Robots.Grasshopper
         public void DrawViewportMeshes(IGH_PreviewArgs args) => base.Preview_DrawMeshes(args);
 
     }
+
+    // Trigg Param
+    public class TriggParameter : GH_PersistentParam<GH_Trigg>
+    {
+        public TriggParameter() : base("Trigg parameter", "Trigg", "This is a trigg command for ABB robots.", "Robots", "Parameters") { }
+        public override GH_Exposure Exposure => GH_Exposure.secondary;
+        protected override System.Drawing.Bitmap Icon => Properties.Resources.iconCommandParam; // need to create trigg icon
+        public override Guid ComponentGuid => new Guid("{1e90400a-8b67-4157-9419-4f8f0571aba8}");
+        protected override GH_GetterResult Prompt_Singular(ref GH_Trigg value)
+        {
+            value = new GH_Trigg();
+            return GH_GetterResult.success;
+        }
+        protected override GH_GetterResult Prompt_Plural(ref List<GH_Trigg> values)
+        {
+            values = new List<GH_Trigg>();
+            return GH_GetterResult.success;
+        }
+    }
 }

@@ -343,4 +343,28 @@ namespace Robots.Grasshopper
         }
 
     }
+
+    // 
+    public class GH_Trigg : GH_Goo<Trigg>
+    {
+        public GH_Trigg() { this.Value = Trigg.Default; }
+        public GH_Trigg(GH_Trigg goo) { this.Value = goo.Value; }
+        public GH_Trigg(Trigg native) { this.Value = native; }
+        public override IGH_Goo Duplicate() => new GH_Trigg(this);
+        public override bool IsValid => true;
+        public override string TypeName => "Trigg";
+        public override string TypeDescription => "Trigg";
+        public override string ToString() => this.Value?.ToString();
+        public override object ScriptVariable() => Value;
+
+        public override bool CastFrom(object source)
+        { 
+            if (source is Command)
+            {
+                Value = source as Command;
+                return true;
+            }
+            return false;
+        }
+    }
 }

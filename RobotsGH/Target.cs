@@ -18,7 +18,7 @@ namespace Robots.Grasshopper
     {
         public CreateTarget() : base("Create target", "Target", "Creates or modifies a target. Right click for additional inputs", "Robots", "Components") { }
         public override GH_Exposure Exposure => GH_Exposure.secondary;
-        public override Guid ComponentGuid => new Guid("{BC68DC2C-EED6-4717-9F49-80A2B21B75B6}");
+        public override Guid ComponentGuid => new Guid("{b3bcca75-3ded-4f3b-ad76-7c614a06799c}"); // Changed GUID
         protected override Bitmap Icon => Properties.Resources.iconCreateTarget;
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -44,6 +44,7 @@ namespace Robots.Grasshopper
             bool hasCommand = Params.Input.Any(x => x.Name == "Command");
             bool hasFrame = Params.Input.Any(x => x.Name == "Frame");
             bool hasExternal = Params.Input.Any(x => x.Name == "External");
+            bool hasTrigg = RegisterInput.Any(x => x.Name == "Trigg"); // trigg addition for ABB robots
 
             GH_Target sourceTarget = null;
             if (hasTarget) if (!DA.GetData("Target", ref sourceTarget)) return;
@@ -58,6 +59,7 @@ namespace Robots.Grasshopper
             Command command = null;
             Frame frame = null;
             double[] external = null;
+            Trigg trigg = null;
 
             if (hasJoints)
             {
@@ -186,6 +188,17 @@ namespace Robots.Grasshopper
                 external = sourceTarget.Value.External;
             }
 
+            if (hasTrigg) // trigg - not sure what goes here
+            {
+                bool triggGH = null;
+                DA.GetData("Trigg", ref triggGH);
+                trigg = triggGH?.Value;
+            }
+            else if (sourceTarget != null)
+            {
+                trigg = sourceTarget.Value.Trigg;
+            }
+
             Target target;
 
             bool localCartesian = isCartesian;
@@ -206,7 +219,7 @@ namespace Robots.Grasshopper
 
         // Variable inputs
 
-        IGH_Param[] parameters = new IGH_Param[11]
+        IGH_Param[] parameters = new IGH_Param[12]
 {
          new TargetParameter() { Name = "Target", NickName = "T", Description = "Reference target", Optional = false },
          new Param_String() { Name = "Joints", NickName = "J", Description = "Joint rotations in radians", Optional = false },
@@ -218,7 +231,8 @@ namespace Robots.Grasshopper
          new ZoneParameter() { Name = "Zone", NickName = "Z", Description = "Aproximation zone in mm", Optional = true },
          new CommandParameter() { Name = "Command", NickName = "C", Description = "Robot command", Optional = true },
          new FrameParameter() { Name = "Frame", NickName = "F", Description = "Base frame", Optional = true },
-         new Param_String() { Name = "External", NickName = "E", Description = "External axis", Optional = true }
+         new Param_String() { Name = "External", NickName = "E", Description = "External axis", Optional = true },
+         new Param_String() { Name = "Trigg", NickName = "Tr", Description = "Use Trigg Commands (ABB Only)", Optional = true } // Trigg
 };
 
         bool isCartesian = true;
@@ -255,6 +269,7 @@ namespace Robots.Grasshopper
             Menu_AppendItem(menu, "Command input", AddCommand, true, Params.Input.Any(x => x.Name == "Command"));
             Menu_AppendItem(menu, "Frame input", AddFrame, true, Params.Input.Any(x => x.Name == "Frame"));
             Menu_AppendItem(menu, "External input", AddExternal, true, Params.Input.Any(x => x.Name == "External"));
+            Menu_AppendItem(menu, "Use Trigg input", AddTrigg, true, Params.Input.Any(x => x.Name == "Trigg")); // trigg
         }
 
         // Varible methods
@@ -358,6 +373,7 @@ namespace Robots.Grasshopper
         private void AddCommand(object sender, EventArgs e) => AddParam(8);
         private void AddFrame(object sender, EventArgs e) => AddParam(9);
         private void AddExternal(object sender, EventArgs e) => AddParam(10);
+        private void AddTrigg(object sender, EventArgs e) => AddParam(11);
 
         bool IGH_VariableParameterComponent.CanInsertParameter(GH_ParameterSide side, int index) => false;
         bool IGH_VariableParameterComponent.CanRemoveParameter(GH_ParameterSide side, int index) => false;
@@ -371,7 +387,7 @@ namespace Robots.Grasshopper
     {
         public DeconstructTarget() : base("Deconstruct target", "DeTarget", "Deconstructs a target. Right click for additional outputs", "Robots", "Components") { }
         public override GH_Exposure Exposure => GH_Exposure.secondary;
-        public override Guid ComponentGuid => new Guid("{3252D880-59F9-4C9A-8A92-A6CD4C0BA591}");
+        public override Guid ComponentGuid => new Guid("{0aaad15f-36f1-4c7e-88a1-b8851f7ff30c}"); // new GUID
         protected override Bitmap Icon => Properties.Resources.iconDeconstructTarget;
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
@@ -402,6 +418,7 @@ namespace Robots.Grasshopper
             bool hasCommand = Params.Output.Any(x => x.Name == "Command");
             bool hasFrame = Params.Output.Any(x => x.Name == "Frame");
             bool hasExternal = Params.Output.Any(x => x.Name == "External");
+            bool hasTrigg = Params.Output.Any(x => x.Name == "Trigg"); // trigg
 
             if (hasJoints) DA.SetData("Joints", isCartesian ? null : new GH_String(string.Join(",", (target.Value as JointTarget).Joints.Select(x => $"{x:0.000}"))));
             if (hasPlane) DA.SetData("Plane", isCartesian ? new GH_Plane((target.Value as CartesianTarget).Plane) : null);
@@ -413,6 +430,7 @@ namespace Robots.Grasshopper
             if (hasCommand) DA.SetData("Command", new GH_Command(target.Value.Command));
             if (hasFrame) DA.SetData("Frame", new GH_Frame(target.Value.Frame));
             if (hasExternal) DA.SetData("External", new GH_String(string.Join(",", target.Value.External.Select(x => $"{x:0.000}"))));
+            if (hasFrame) DA.SetData("Trigg", new GH_String("tba")); // trigg - add the bool list for trigg
         }
 
         // Variable outputs
@@ -430,7 +448,8 @@ namespace Robots.Grasshopper
          new ZoneParameter() { Name = "Zone", NickName = "Z", Description = "Approximation zone in mm", Optional = true },
          new CommandParameter() { Name = "Command", NickName = "C", Description = "Robot command", Optional = true },
          new FrameParameter() { Name = "Frame", NickName = "F", Description = "Base frame", Optional = true },
-         new Param_String() { Name = "External", NickName = "E", Description = "External axes", Optional = true }
+         new Param_String() { Name = "External", NickName = "E", Description = "External axes", Optional = true },
+         new Param_String() { Name = "Trigg", NickName = "Tr", Description = "Use Trigg Commands (ABB Only)", Optional = true } // trigg
 };
 
         // Menu items
@@ -449,6 +468,7 @@ namespace Robots.Grasshopper
             Menu_AppendItem(menu, "Command output", AddCommand, true, Params.Output.Any(x => x.Name == "Command"));
             Menu_AppendItem(menu, "Frame output", AddFrame, true, Params.Output.Any(x => x.Name == "Frame"));
             Menu_AppendItem(menu, "External output", AddExternal, true, Params.Output.Any(x => x.Name == "External"));
+            Menu_AppendItem(menu, "Trigg output", AddTrigg, true, Params.Output.Any(x => x.Name == "Trigg")); // trigg
         }
 
         private void AddParam(int index)
@@ -485,6 +505,7 @@ namespace Robots.Grasshopper
         private void AddCommand(object sender, EventArgs e) => AddParam(7);
         private void AddFrame(object sender, EventArgs e) => AddParam(8);
         private void AddExternal(object sender, EventArgs e) => AddParam(9);
+        private void AddTrigg(object sender, EventArgs e) => AddParam(10);
 
         bool IGH_VariableParameterComponent.CanInsertParameter(GH_ParameterSide side, int index) => false;
         bool IGH_VariableParameterComponent.CanRemoveParameter(GH_ParameterSide side, int index) => false;
